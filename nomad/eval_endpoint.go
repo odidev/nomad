@@ -363,15 +363,45 @@ func (e *Eval) List(args *structs.EvalListRequest,
 			}
 
 			var evals []*structs.Evaluation
+			var itemCount int32
+			var lastToken string
+			foundToken := args.QueryOptions.LastToken == ""
 			for {
 				raw := iter.Next()
 				if raw == nil {
+					lastToken = ""
 					break
 				}
 				eval := raw.(*structs.Evaluation)
+
+				// note: using a gomemdb.FilterIterator doesn't get us
+				// anything here because we'd need all this same logic
+				// in the FilterFunc, as well as an extra type cast
+				if args.FilterJobID != "" && args.FilterJobID != eval.JobID {
+					continue
+				}
+				if args.FilterEvalStatus != "" && args.FilterEvalStatus != eval.Status {
+					continue
+				}
+				if !foundToken {
+					if eval.ID == args.QueryOptions.LastToken {
+						foundToken = true
+					}
+					continue
+				}
+				itemCount++
+				if args.QueryOptions.PerPage != 0 && itemCount > args.QueryOptions.PerPage {
+					break
+				}
+
+				lastToken = eval.ID
 				evals = append(evals, eval)
 			}
+
 			reply.Evaluations = evals
+			if args.QueryOptions.PerPage != 0 {
+				reply.QueryMeta.LastToken = lastToken
+			}
 
 			// Use the last index that affected the jobs table
 			index, err := state.Index("evals")

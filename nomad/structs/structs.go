@@ -854,6 +854,8 @@ type EvalDequeueRequest struct {
 
 // EvalListRequest is used to list the evaluations
 type EvalListRequest struct {
+	FilterJobID      string
+	FilterEvalStatus string
 	QueryOptions
 }
 
